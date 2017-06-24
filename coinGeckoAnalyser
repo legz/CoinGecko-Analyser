@@ -58,7 +58,7 @@ analyse () {
 		local ratingOld=$(echo "$lineOld" | cut -d"@" -f3)
 		local ratingNew=$(echo "$lineNew" | cut -d"@" -f3)
 		if [[ -z "$ratingOld" ]]; then continue; fi
-		local delta=$(echo "$ratingNew - $ratingOld" | bc)
+		local delta=$(($ratingNew - $ratingOld))
 		if [[ "$delta" -gt 1 ]]; then
 			echo "$currency: +$delta (from $ratingOld to $ratingNew)" >> ./analysis/$today.tmp
 		fi
