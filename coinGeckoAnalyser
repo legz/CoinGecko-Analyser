@@ -1,0 +1,82 @@
+#!/bin/bash
+# ------------------------------------------------------------------
+# [LegZ] 	CoinGecko Analyser
+# 			A small shell script to periodically scrap CoinGecko currencies ranking and analyse variations.
+#			v1.0: Init
+# ------------------------------------------------------------------
+SUBJECT=CoinGecko-Analyser
+VERSION=1.0
+
+# -----------------------------------------------------------------
+LOCK_FILE=/tmp/${SUBJECT}.lock
+
+if [ -f "$LOCK_FILE" ]; then
+	echo "Script is already running"
+	exit
+fi
+
+# -----------------------------------------------------------------
+if [[ $# -lt 1 ]] ; then
+    echo "Scrap (-s) or Analyse (-a)? You must specify an argument."
+    exit 2
+fi
+	while getopts ":sa" optname
+	  do
+	    case "$optname" in
+	      s)	mode=scrap ;;
+		  a)	mode=analyse ;;
+	      \?) 	echo "Invalid option -${OPTARG}"; exit 1 ;;
+	      :)	echo "Option -${OPTARG} requires an argument."; exit 1 ;;
+	      *)	echo "Unknown error while processing options"; exit 1 ;;
+	    esac
+	  done
+
+# -----------------------------------------------------------------
+trap "rm -f $LOCK_FILE && rm -f ./analysis/*.tmp" EXIT
+touch $LOCK_FILE 
+
+
+# --- Functions ----------------------------------------------------
+scrap () {
+	local url=$1
+	local page=$(curl -s -m 10 $url)
+	for i in $(echo "$page" | grep "<span>[a-zA-Z]*</span>" ); do
+		local currency=$(echo "$i" | cut -d ">" -f2 | cut -d"<" -f1)
+		local block=$(echo "$page" | egrep -A 30 -B 20 "$i")
+		local position=$(echo "$block" | grep -A 1 "<div style='font-size:16px;'>" | tail -n 1)
+		local score=$(echo "$block" | grep "<div>[0-9]*</div>" | cut -d ">" -f2 | cut -d"<" -f1)
+		echo "${position//[[:blank:]]/}@$currency@$score" >> ./scrap/$today
+	done
+}
+
+analyse () {
+	refFile=$(ls ./scrap/ | head -n 1)	# @TODO: Input argument
+	rm -f ./analysis/$today.tmp
+	while read lineNew; do		
+		local currency=$(echo "$lineNew" | cut -d"@" -f2)
+		local lineOld=$(cat ./scrap/$refFile | grep "@$currency@")
+		local ratingOld=$(echo "$lineOld" | cut -d"@" -f3)
+		local ratingNew=$(echo "$lineNew" | cut -d"@" -f3)
+		if [[ -z "$ratingOld" ]]; then continue; fi
+		local delta=$(echo "$ratingNew - $ratingOld" | bc)
+		if [[ "$delta" -gt 1 ]]; then
+			echo "$currency: +$delta (from $ratingOld to $ratingNew)" >> ./analysis/$today.tmp
+		fi
+	done < ./scrap/$today
+	echo "Analysis - Evolution between $refFile and $today" > ./analysis/$today
+	cat ./analysis/$today.tmp | sort -k2.3 -nr | head -n 10 >> ./analysis/$today
+}
+
+# --- Run script ---------------------------------------------------
+today=$(date +%Y-%m-%d)
+if [[ "$mode" = "scrap" ]]; then
+	mkdir -p scrap
+	rm -f ./scrap/$today
+	echo "Scrapping page 1..." && scrap https://www.coingecko.com/en
+	echo "Scrapping page 2..." && scrap https://www.coingecko.com/en?page=2
+elif [[ "$mode" = "analyse" ]]; then
+	mkdir -p analysis
+	analyse
+fi
+
+exit 0
