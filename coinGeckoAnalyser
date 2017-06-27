@@ -51,6 +51,7 @@ scrap () {
 
 analyse () {
 	refFile=$(/bin/ls -A ./scrap/ | head -n 1)	# @TODO: Input argument
+	lastFile=$(/bin/ls -Ar ./scrap/ | head -n 1)
 	rm -f ./analysis/$today.tmp
 	while read lineNew; do		
 		local currency=$(echo "$lineNew" | cut -d"@" -f2)
@@ -62,7 +63,7 @@ analyse () {
 		if [[ "$delta" -gt 1 ]]; then
 			echo "$currency: +$delta (from $ratingOld to $ratingNew)" >> ./analysis/$today.tmp
 		fi
-	done < ./scrap/$today
+	done < ./scrap/$lastFile
 	echo "Analysis - Evolution between $refFile and $today" > ./analysis/$today
 	cat ./analysis/$today.tmp | sort -k2.3 -nr | head -n 10 >> ./analysis/$today
 }
