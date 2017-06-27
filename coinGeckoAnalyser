@@ -50,7 +50,7 @@ scrap () {
 }
 
 analyse () {
-	refFile=$(ls ./scrap/ | head -n 1)	# @TODO: Input argument
+	refFile=$(/bin/ls -A ./scrap/ | head -n 1)	# @TODO: Input argument
 	rm -f ./analysis/$today.tmp
 	while read lineNew; do		
 		local currency=$(echo "$lineNew" | cut -d"@" -f2)
